@@ -2,7 +2,7 @@ import numpy as np
 import threading
 import time
 from queue import Queue
-
+from PIL import Image, ImageDraw
 import utils
 from backends.backend import Backend
 
@@ -132,3 +132,88 @@ class TfliteBackend(Backend):
     def destroy(self):
         del self.interpreter
 
+
+
+class TfliteDetectorBackend(TfliteBackend):
+    def __init__(self, name, device="tpu"):
+        super(TfliteBackend, self).__init__(name)
+        self.precision = "int8"
+        self.accelerator = "Edge TPU" if device=="tpu" else ""
+        self.device = device
+        if self.device == "tpu":
+            from pycoral.adapters import common, detect
+            from pycoral.utils.edgetpu import make_interpreter
+            self.make_interpreter = make_interpreter
+        else:
+            import tflite_runtime
+            import tflite_runtime.interpreter as tflite
+            import helpers.tflite_common as common
+            import helpers.tflite_detect as detect
+            self.make_interpreter = tflite.Interpreter
+        
+        self.common = common
+        self.detect = detect
+    
+    def get_accelerator(self):
+        return self.accelerator
+
+    def name(self):
+        return self.name
+    
+    def version(self):
+        import tflite_runtime
+        return tflite_runtime.__version__
+    
+    def get_preprocess_func(self, model_name):
+        model_names = ["resnet50", "mobilenet_v1", "mobilenet_v2", "mobilenet_v3", "inception_v1", "inception_v2", \
+            "inception_v3", "inception_v4", "efficientnet_small_b0", "efficientnet_medium_b1", "efficientnet_large_b3"]
+        if model_name not in model_names:
+            raise ValueError(f"Please provide a valid model name from {model_names}")
+        
+        if model_name == "resnet50":
+            return utils.preprocess_tflite_resnet
+        else:
+            return utils.preprocess_tflite_mobilenet
+
+    def load_backend(self, model_path, model_name=None):
+        self.model_name = model_name
+        self.interpreter = self.make_interpreter(model_path)
+        
+        self.interpreter.allocate_tensors()
+
+    
+    def __call__(self, inputs, output="out.png"):
+        print(inputs.size)
+        _, scale = self.common.set_resized_input(
+            self.interpreter, inputs.size, lambda size: inputs.resize(size, Image.LANCZOS))
+        
+        start = time.time()
+        self.interpreter.invoke()
+        end = time.time()
+
+        objs = self.detect.get_objects(self.interpreter, 0.6, scale)
+        if not objs:
+            print('No objects detected')
+
+        for obj in objs:
+            print('  id:    ', obj.id)
+            print('  score: ', obj.score)
+            print('  bbox:  ', obj.bbox)
+
+        if output:
+            image = inputs.convert('RGB')
+            self.draw_objects(ImageDraw.Draw(image), objs)
+            image.save(output)
+        return objs, end - start
+    
+    def draw_objects(self, draw, objs):
+        """Draws the bounding box and label for each object."""
+        for obj in objs:
+            bbox = obj.bbox
+            draw.rectangle([(bbox.xmin, bbox.ymin), (bbox.xmax, bbox.ymax)],
+                        outline='red')
+            draw.text((bbox.xmin + 10, bbox.ymin + 10),
+                    '%s\n%.2f' % (obj.id, obj.score),
+                    fill='red')
+    
+    

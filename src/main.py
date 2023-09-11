@@ -8,6 +8,59 @@ import requests
 import metrics
 
 
+def coco(args):
+    print(args)
+    os.makedirs(args.preprocessed_dir, exist_ok=True)
+
+    backend = None
+    data = None
+    
+    if args.backend == "tflite":
+        if args.device == None:
+            raise ValueError("Please mention the device to run tflite backend --device tpu/cpu")
+        from backends.tflite import TfliteDetectorBackend
+        backend = TfliteDetectorBackend(name="tflite", device=args.device)
+        data = np.ones((args.input_size[0], args.input_size[1], 3), dtype=np.float32)
+    
+    
+    # preprocess and save np array
+    jpeg_files_list = os.listdir(args.dataset_path)
+
+    preprocess_func = backend.get_preprocess_func(args.model_name)
+    
+    if args.count:
+        jpeg_files_list = jpeg_files_list[:args.count]
+
+    # for filename in tqdm(jpeg_files_list, desc="Preprocessing", unit="image"):
+    #     if not filename.lower().endswith('.jpeg'):
+    #         continue
+    #     jpeg_path = os.path.join(args.dataset_path, filename)
+    #     npy_path = os.path.join(args.preprocessed_dir, filename.replace("JPEG", "npy"))
+    #     if os.path.exists(npy_path):
+    #         continue
+    #     preprocessed = preprocess_func(jpeg_path, size=args.input_size)
+    #     np.save(npy_path, preprocessed)
+    
+    # load val_map
+    if backend is None:
+        print("backend is none")
+        return
+    
+    backend.load_backend(args.model_path, model_name=args.model_name)
+    # backend.warmup(data)
+
+    backend.capture_stats()
+    for filename in tqdm(jpeg_files_list, desc="inference", unit="image"):
+        from PIL import Image
+        print(filename, os.path.join(args.dataset_path, filename))
+        image = Image.open(os.path.join(args.dataset_path, filename))
+        output = backend(image)
+    
+    print("Done.")
+
+
+
+
 def main(args):
     print(args)
     os.makedirs(args.preprocessed_dir, exist_ok=True)
@@ -39,7 +92,7 @@ def main(args):
 
     
     # preprocess and save np array
-    jpeg_files_list = os.listdir(args.imagenet)
+    jpeg_files_list = os.listdir(args.dataset_path)
 
     preprocess_func = backend.get_preprocess_func(args.model_name)
     
@@ -49,7 +102,7 @@ def main(args):
     for filename in tqdm(jpeg_files_list, desc="Preprocessing", unit="image"):
         if not filename.lower().endswith('.jpeg'):
             continue
-        jpeg_path = os.path.join(args.imagenet, filename)
+        jpeg_path = os.path.join(args.dataset_path, filename)
         npy_path = os.path.join(args.preprocessed_dir, filename.replace("JPEG", "npy"))
         if os.path.exists(npy_path):
             continue
@@ -58,7 +111,7 @@ def main(args):
     
     # load val_map
     labels = {}
-    with open(os.path.join(args.imagenet, 'val_map.txt'), "r") as f:
+    with open(os.path.join(args.dataset_path, 'val_map.txt'), "r") as f:
         lines = f.readlines()
         for line in lines:
             p, l = line.split(' ')
@@ -168,7 +221,13 @@ def post(data, url=None):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--imagenet",
+        "--dataset",
+        default=None,
+        type=str,
+        help="dataset name from [imagenet, coco]"
+        )
+    parser.add_argument(
+        "--dataset-path",
         default='/mnt/workspace/imagenet-2012/val',
         type=str,
         help="directory with imagenet images"
@@ -222,11 +281,9 @@ if __name__ == '__main__':
         type=str,
         help="device to run benchmark on"
     )
-    parser.add_argument(
-        "--device",
-        default=None,
-        type=str,
-        help="device to run benchmark on"
-    )
+
     args = parser.parse_args()
-    main(args)
+    if args.dataset == "coco":
+        coco(args)
+    else:
+        main(args)
