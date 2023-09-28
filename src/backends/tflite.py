@@ -59,21 +59,25 @@ class TfliteBackend(Backend):
         self.input_zero_point = params['zero_points']
     
     def __call__(self, inputs):
+        start = time.time()
         inputs = inputs / self.input_scale + self.input_zero_point
         inputs = inputs.astype(np.uint8)
+        if self.device != "tpu":
+            inputs = np.expand_dims(inputs, axis=0)
+        
+        
         if self.device == "tpu":        
             self.common.set_input(self.interpreter, inputs)
         else:
-            inputs = np.expand_dims(inputs, axis=0)
             self.interpreter.set_tensor(self.input_details['index'], inputs)
     
-        start = time.time()
         self.interpreter.invoke()
-        end = time.time()
+        
         if self.device == "tpu":
             classes = self.classify.get_classes(self.interpreter, 1, 0.0)
         else:
             classes = self.interpreter.get_tensor(self.output_details['index'])
+        end = time.time()
         return classes, end - start
     
     def warmup(self, inputs, warmup_steps=100):
