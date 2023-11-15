@@ -1,16 +1,15 @@
 {
   "files": {
-    "main.css": "/MLBench/static/css/main.06cac8d3.css",
-    "main.js": "/MLBench/static/js/main.d42a4d0c.js",
+    "main.css": "/MLBench/static/css/main.e9e2175b.css",
+    "main.js": "/MLBench/static/js/main.c48527bc.js",
     "static/js/787.a3f08d4e.chunk.js": "/MLBench/static/js/787.a3f08d4e.chunk.js",
-    "static/media/collabora.png": "/MLBench/static/media/collabora.2465186925c79f2f8a54.png",
     "index.html": "/MLBench/index.html",
-    "main.06cac8d3.css.map": "/MLBench/static/css/main.06cac8d3.css.map",
-    "main.d42a4d0c.js.map": "/MLBench/static/js/main.d42a4d0c.js.map",
+    "main.e9e2175b.css.map": "/MLBench/static/css/main.e9e2175b.css.map",
+    "main.c48527bc.js.map": "/MLBench/static/js/main.c48527bc.js.map",
     "787.a3f08d4e.chunk.js.map": "/MLBench/static/js/787.a3f08d4e.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.06cac8d3.css",
-    "static/js/main.d42a4d0c.js"
+    "static/css/main.e9e2175b.css",
+    "static/js/main.c48527bc.js"
   ]
 }
